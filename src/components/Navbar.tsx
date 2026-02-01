@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import type { RootState } from '../store/store'
 import { setUser } from '../store/authSlice'
 import type { JSX } from 'react'
+import logo from "../assets/logo.webp";
 
 
 export default function Navbar(): JSX.Element {
@@ -26,9 +27,8 @@ export default function Navbar(): JSX.Element {
     ">
 
       <Link to="/" className="text-white font-bold text-xl">
-        Blogify
+      <img src={logo} alt="Logo" className="h-8" />
       </Link>
-
 
       <div className="flex items-center gap-6 text-white">
         {user && (
