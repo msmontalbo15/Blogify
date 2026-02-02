@@ -11,6 +11,7 @@ interface Blog {
   content: string
   image_url: string | null
   created_at: string
+  category: string
   author: {
     full_name: string
     avatar_url: string | null
@@ -29,43 +30,21 @@ export function BlogListPage(): JSX.Element {
     fetchBlogs()
   }, [page])
 
-const fetchBlogs = async () => {
-  setLoading(true)
+  const fetchBlogs = async () => {
+    setLoading(true)
 
-  const from = page * PAGE_SIZE
-  const to = from + PAGE_SIZE - 1
+    const from = page * PAGE_SIZE
+    const to = from + PAGE_SIZE - 1
 
-  const { data, error } = await supabase
-  .from('blogs')
-  .select(`
-    id,
-    title,
-    content,
-    image_url,
-    created_at,
-    author:profiles (
-      full_name,
-      avatar_url
-    )
-  `)
-    .order('created_at', { ascending: false })
-    .range(from, to)
+    const { data } = await supabase
+      .from('blogs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(from, to)
 
-  if (error) {
-    console.error('Error fetching blogs:', error.message)
-  } else if (data) {
-    // We map the data to flatten the author array into a single object
-    const formattedBlogs = data.map((blog: any) => ({
-      ...blog,
-      // If author is an array, take the first element; otherwise use as is
-      author: Array.isArray(blog.author) ? blog.author[0] : blog.author
-    })) as Blog[]
-
-    setBlogs(formattedBlogs)
+    if (data) setBlogs(data)
+    setLoading(false)
   }
-  
-  setLoading(false)
-}
 
   if (loading && blogs.length === 0) {
     return (
@@ -121,6 +100,9 @@ const fetchBlogs = async () => {
                 <div className="flex items-center gap-4 text-sm text-gray-400 mb-2">
                   <span>
                     {new Date(blog.created_at).toLocaleDateString()}
+                  </span>
+                  <span className="bg-slate-800 px-3 py-1 rounded-full text-xs">
+                    {blog.category}
                   </span>
                 </div>
 

@@ -10,6 +10,9 @@ export function RegisterPage(): JSX.Element {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fullName, setFullName] = useState("")
+
+
 
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault()
@@ -17,15 +20,21 @@ export function RegisterPage(): JSX.Element {
     setError(null)
 
     const { data, error } = await supabase.auth.signUp({
-    email,
-    password
-  })
+  email,
+  password,
+  options: {
+    data: {
+      full_name: fullName,
+    },
+  },
+})
 
-    if (error) {
-      setError(error.message)
+    if (error || !data.user) {
+      alert(error?.message)
       setLoading(false)
       return
     }
+
 
     if (data.user) {
       navigate('/blogs', { replace: true })
@@ -36,7 +45,7 @@ export function RegisterPage(): JSX.Element {
 
   return (
     <div className="min-h-screen flex items-center justify-center">
-        <form onSubmit={handleRegister}
+      <form onSubmit={handleRegister}
         className="
   bg-white/10 
   backdrop-blur-lg 
@@ -48,6 +57,16 @@ export function RegisterPage(): JSX.Element {
         <h1 className="text-2xl font-bold">Register</h1>
 
         {error && <p className="text-red-600">{error}</p>}
+
+
+        <input
+          type="text"
+          placeholder="Full Name"
+          className="w-full border p-2"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          required
+        />
 
         <input
           type="email"

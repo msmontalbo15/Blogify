@@ -67,7 +67,7 @@ export function ViewBlogPage(): JSX.Element {
         </Link>
         <button
           onClick={handleDelete}
-          className="border px-3 py-1 text-red-600"
+          className="border px-4 py-2 text-red-600"
         >
           Delete
         </button>

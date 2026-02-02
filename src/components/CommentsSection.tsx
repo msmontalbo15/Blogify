@@ -14,7 +14,12 @@ interface Comment {
   image_url: string | null
   author_id: string
   created_at: string
+  profiles: {
+    full_name: string
+    avatar_url: string | null
+  }[]
 }
+
 
 export default function CommentsSection({ blogId }: Props): JSX.Element {
   const user = useSelector((state: RootState) => state.auth.user) as { id: string } | null
@@ -23,18 +28,38 @@ export default function CommentsSection({ blogId }: Props): JSX.Element {
   const [content, setContent] = useState('')
   const [image, setImage] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState('')
+
 
   useEffect(() => {
     fetchComments()
   }, [blogId])
 
   const fetchComments = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('comments')
-      .select('*')
+      .select(`
+    id,
+    content,
+    image_url,
+    author_id,
+    created_at,
+    profiles:profiles!comments_author_id_fkey (
+      full_name,
+      avatar_url
+    )
+  `)
       .eq('blog_id', blogId)
       .order('created_at', { ascending: true })
 
+
+    console.log('RAW COMMENTS:', data, error)
+
+    if (error) {
+      console.error('FETCH COMMENTS ERROR:', error)
+      return
+    }
     setComments(data ?? [])
   }
 
@@ -53,12 +78,12 @@ export default function CommentsSection({ blogId }: Props): JSX.Element {
         .from('comment-images')
         .upload(path, image)
 
-        console.log('UPLOAD ERROR:', uploadError)
+      console.log('UPLOAD ERROR:', uploadError)
 
-    if (uploadError) {
-      setLoading(false)
-      return
-    }
+      if (uploadError) {
+        setLoading(false)
+        return
+      }
 
       if (!uploadError) {
         imageUrl = supabase.storage
@@ -67,55 +92,142 @@ export default function CommentsSection({ blogId }: Props): JSX.Element {
       }
     }
 
- await supabase.from('comments').insert({
+  const { data, error } = await supabase.from('comments').insert({
   blog_id: blogId,
   content,
   image_url: imageUrl,
   author_id: user.id
-})
+});
 
-  setLoading(false)
+console.log('INSERT COMMENT:', { data, error });
+
+    setLoading(false)
 
     setContent('')
     setImage(null)
     setLoading(false)
     fetchComments()
-  
 
-    
   }
+
+  const handleUpdate = async (commentId: string) => {
+    if (!editContent.trim()) return
+
+    setLoading(true)
+
+    const { error } = await supabase
+      .from('comments')
+      .update({ content: editContent })
+      .eq('id', commentId)
+
+    if (error) {
+      console.error('UPDATE ERROR:', error)
+      setLoading(false)
+      return
+    }
+
+    setEditingId(null)
+    setEditContent('')
+    setLoading(false)
+    fetchComments()
+  }
+
 
   const handleDelete = async (id: string) => {
     await supabase.from('comments').delete().eq('id', id)
     fetchComments()
   }
 
-  
+
 
   return (
     <div className="mt-10 space-y-4">
       <h2 className="text-xl font-bold">Comments</h2>
 
       {comments.map(comment => (
-        <div key={comment.id} className="border p-3 rounded">
-          <p>{comment.content}</p>
+        <div key={comment.id} className="
+                  bg-white/5 border border-white/10
+                  rounded-xl p-6 hover:border-blue-500/40
+                  transition cursor-pointer
+                  transition-transform duration-300 group-hover:scale-105
+                ">
+          {editingId === comment.id ? (
+            <>
+              <textarea
+                className="w-full border p-2 rounded"
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+              />
 
-          {comment.image_url && (
-            <img
-              src={comment.image_url}
-              className="mt-2 w-40 rounded"
-            />
-          )}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleUpdate(comment.id)}
+                  className="text-sm text-blue-600"
+                >
+                  Save
+                </button>
 
-          {user?.id === comment.author_id && (
-            <button
-              onClick={() => handleDelete(comment.id)}
-              className="text-sm text-red-600 mt-2"
-            >
-              Delete
-            </button>
+                <button
+                  onClick={() => {
+                    setEditingId(null)
+                    setEditContent('')
+                  }}
+                  className="text-sm text-gray-500"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 mb-2">
+                {comment.profiles[0]?.avatar_url ? (
+                  <img
+                    src={comment.profiles[0].avatar_url}
+                    className="w-8 h-8 rounded-full"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-sm">
+                    {comment.profiles[0]?.full_name?.[0] ?? '?'}
+                  </div>
+                )}
+
+                <span className="text-sm font-medium">
+                  {comment.profiles[0]?.full_name ?? 'Unknown'}
+                </span>
+              </div>
+
+
+              <p>{comment.content}</p>
+
+              {comment.image_url && (
+                <img src={comment.image_url} className="mt-2 w-40 rounded" />
+              )}
+
+              {user?.id === comment.author_id && (
+                <div className="flex gap-3 mt-2">
+                  <button
+                    onClick={() => {
+                      setEditingId(comment.id)
+                      setEditContent(comment.content)
+                    }}
+                    className="text-sm text-blue-600"
+                  >
+                    Edit
+                  </button>
+
+                  <button
+                    onClick={() => handleDelete(comment.id)}
+                    className="text-sm text-red-600"
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
+
       ))}
 
       {user && (

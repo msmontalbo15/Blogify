@@ -41,13 +41,13 @@ export function LoginPage(): JSX.Element {
       <form
         onSubmit={handleLogin}
         className="
-  bg-white/10 
-  backdrop-blur-lg 
-  border border-white/20 
-  rounded-xl 
-  p-8 
-  shadow-xl
-">
+          bg-white/10 
+          backdrop-blur-lg 
+          border border-white/20 
+          rounded-xl 
+          p-8 
+          shadow-xl
+        ">
         <h1 className="text-2xl font-bold">Login</h1>
 
         {error && (

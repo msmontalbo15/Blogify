@@ -27,9 +27,8 @@ export default function Navbar(): JSX.Element {
     ">
 
       <Link to="/" className="text-white font-bold text-xl">
-      <img src={logo} alt="Logo" className="h-8" />
+      <img src={logo} alt="Logo" className="h-8 border rounded" />
       </Link>
-
       <div className="flex items-center gap-6 text-white">
         {user && (
           <>
