@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { JSX } from 'react'
 import CommentsSection from '../components/CommentsSection'
@@ -9,72 +9,117 @@ interface Blog {
   id: string
   title: string
   content: string
+  created_at: string
   image_url: string | null
   author_id: string
+  profiles: {
+    full_name: string
+  }[]
 }
 
 export function ViewBlogPage(): JSX.Element {
-  const [error] = useState<string | null>(null)
+  // const [error] = useState<string | null>(null)
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
+  const [userId, setUserId] = useState<string | null>(null)
+
   const [blog, setBlog] = useState<Blog | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchBlog()
+    const fetchData = async () => {
+      setLoading(true)
+
+      // get logged-in user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      setUserId(user?.id ?? null)
+
+      // fetch blog + author name
+      const { data, error } = await supabase
+  .from('blogs')
+  .select(`
+    id,
+    title,
+    content,
+    created_at,
+    image_url,
+    author_id,
+    profiles:profiles!blogs_author_id_fkey (
+      full_name
+    )
+  `)
+  .eq('id', id)
+  .single()
+
+if (error) {
+  console.error(error)
+  return
+}
+
+setBlog(data)
+
+      setLoading(false)
+    }
+
+    fetchData()
   }, [id])
 
-  const fetchBlog = async () => {
-    const { data } = await supabase
-      .from('blogs')
-      .select('*')
-      .eq('id', id)
-      .single()
-
-    setBlog(data)
-  }
-
   const handleDelete = async () => {
-      const confirm = window.confirm('Delete this blog?')
-       if (!confirm) return
-       
-    await supabase.from('blogs').delete().eq('id', id)
-    navigate('/blogs')
+    if (!blog) return
+
+    const { error } = await supabase
+      .from("blogs")
+      .delete()
+      .eq("id", blog.id)
 
     if (!error) {
-    navigate('/blogs')
+      navigate("/")
+    }
   }
-  }
 
+  if (loading) return <p>Loading...</p>
+  if (!blog) return <p>Blog not found</p>
 
-
-  if (!blog) return <p>Loading...</p>
+  const isAuthor = userId === blog.author_id
 
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
-      <h1 className="text-3xl font-bold">{blog.title}</h1>
+      <h1 className="text-3xl font-bold pt-12">{blog.title}</h1>
 
       {blog.image_url && (
-  <img src={blog.image_url} className="rounded mb-4" />
-)}
-      
+        <img src={blog.image_url} className="rounded mb-4" />
+      )}
 
       <p>{blog.content}</p>
 
-      <div className="flex gap-2">
-        <Link to={`/edit-blog/${blog.id}`} className="border px-3 py-1">
-          Edit
-        </Link>
-        <button
-          onClick={handleDelete}
-          className="border px-4 py-2 text-red-600"
-        >
-          Delete
-        </button>
-      </div>
+      <p className="text-sm text-gray-500">
+        Written by <span className="font-medium">{blog.profiles.full_name}</span>
+      </p>
+
+      {isAuthor && (
+        <div className="flex gap-3">
+          <button
+            onClick={() => navigate(`/edit/${blog.id}`)}
+            className="px-4 py-2 bg-blue-600 text-white rounded"
+          >
+            Edit
+          </button>
+
+          <button
+            onClick={handleDelete}
+            className="px-4 py-2 bg-red-600 text-white rounded"
+          >
+            Delete
+          </button>
+        </div>
+      )}
 
       <CommentsSection blogId={blog.id} />
-<BackButton />
+      <BackButton />
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import type { JSX } from 'react'
 import { motion } from "framer-motion"
 
-
+ 
 interface Blog {
   id: string
   title: string

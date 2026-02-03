@@ -21,6 +21,8 @@ interface Comment {
 }
 
 
+
+
 export default function CommentsSection({ blogId }: Props): JSX.Element {
   const user = useSelector((state: RootState) => state.auth.user) as { id: string } | null
 
@@ -37,9 +39,9 @@ export default function CommentsSection({ blogId }: Props): JSX.Element {
   }, [blogId])
 
   const fetchComments = async () => {
-    const { data, error } = await supabase
-      .from('comments')
-      .select(`
+  const { data, error } = await supabase
+  .from('comments')
+  .select(`
     id,
     content,
     image_url,
@@ -50,17 +52,15 @@ export default function CommentsSection({ blogId }: Props): JSX.Element {
       avatar_url
     )
   `)
-      .eq('blog_id', blogId)
-      .order('created_at', { ascending: true })
+  .eq('blog_id', blogId)
+  .order('created_at', { ascending: true })
 
+if (error) {
+  console.error('FETCH COMMENTS ERROR:', error)
+  return
+}
 
-    console.log('RAW COMMENTS:', data, error)
-
-    if (error) {
-      console.error('FETCH COMMENTS ERROR:', error)
-      return
-    }
-    setComments(data ?? [])
+setComments(data ?? [])
   }
 
   const handlePost = async () => {
@@ -92,14 +92,14 @@ export default function CommentsSection({ blogId }: Props): JSX.Element {
       }
     }
 
-  const { data, error } = await supabase.from('comments').insert({
-  blog_id: blogId,
-  content,
-  image_url: imageUrl,
-  author_id: user.id
-});
+    const { data, error } = await supabase.from('comments').insert({
+      blog_id: blogId,
+      content,
+      image_url: imageUrl,
+      author_id: user.id
+    });
 
-console.log('INSERT COMMENT:', { data, error });
+    console.log('INSERT COMMENT:', { data, error });
 
     setLoading(false)
 
@@ -181,20 +181,20 @@ console.log('INSERT COMMENT:', { data, error });
           ) : (
             <>
               <div className="flex items-center gap-3 mb-2">
-                {comment.profiles[0]?.avatar_url ? (
-                  <img
-                    src={comment.profiles[0].avatar_url}
-                    className="w-8 h-8 rounded-full"
-                  />
+                 {comment.profiles.avatar_url ? (
+    <img
+      src={comment.profiles.avatar_url}
+      className="w-8 h-8 rounded-full"
+    />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-sm">
-                    {comment.profiles[0]?.full_name?.[0] ?? '?'}
-                  </div>
+      {comment.profiles.full_name[0]}
+    </div>
                 )}
 
                 <span className="text-sm font-medium">
-                  {comment.profiles[0]?.full_name ?? 'Unknown'}
-                </span>
+    {comment.profiles.full_name}
+  </span>
               </div>
 
 
