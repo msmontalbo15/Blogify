@@ -6,16 +6,15 @@ import CommentsSection from '../components/CommentsSection'
 import BackButton from '../components/BackButton'
 
 interface Blog {
-  id: string;
-  title: string;
-  content: string;
-  created_at: string;
-  image_url: string;
-  author_id: string;
-  // Update this to be an array
-  profiles: { 
-    full_name: string; 
-  }[]; 
+  id: string
+  title: string
+  content: string
+  created_at: string
+  image_url: string | null
+  author_id: string
+  profiles: {
+    full_name: string
+  } | null
 }
 
 export function ViewBlogPage(): JSX.Element {
@@ -58,7 +57,7 @@ export function ViewBlogPage(): JSX.Element {
       if (error) {
         console.error(error)
       } else {
-        setBlog(data as Blog);
+        setBlog(data)
       }
 
       setLoading(false)
@@ -98,7 +97,7 @@ export function ViewBlogPage(): JSX.Element {
       <p className="text-sm text-gray-500">
         Written by{' '}
         <span className="font-medium">
-          {blog.profiles[0]?.full_name ?? 'Unknown author'}
+           {blog.profiles?.full_name ?? 'Unknown author'}
         </span>
       </p>
 
