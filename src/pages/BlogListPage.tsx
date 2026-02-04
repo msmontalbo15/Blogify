@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import type { JSX } from 'react'
 import { motion } from "framer-motion"
 
- 
+
 interface Blog {
   id: string
   title: string
@@ -29,15 +29,15 @@ export function BlogListPage(): JSX.Element {
     fetchBlogs()
   }, [page])
 
-const fetchBlogs = async () => {
-  setLoading(true)
+  const fetchBlogs = async () => {
+    setLoading(true)
 
-  const from = page * PAGE_SIZE
-  const to = from + PAGE_SIZE - 1
+    const from = page * PAGE_SIZE
+    const to = from + PAGE_SIZE - 1
 
-  const { data, error } = await supabase
-  .from('blogs')
-  .select(`
+    const { data, error } = await supabase
+      .from('blogs')
+      .select(`
     id,
     title,
     content,
@@ -48,24 +48,24 @@ const fetchBlogs = async () => {
       avatar_url
     )
   `)
-    .order('created_at', { ascending: false })
-    .range(from, to)
+      .order('created_at', { ascending: false })
+      .range(from, to)
 
-  if (error) {
-    console.error('Error fetching blogs:', error.message)
-  } else if (data) {
-    // We map the data to flatten the author array into a single object
-    const formattedBlogs = data.map((blog: any) => ({
-      ...blog,
-      // If author is an array, take the first element; otherwise use as is
-      author: Array.isArray(blog.author) ? blog.author[0] : blog.author
-    })) as Blog[]
+    if (error) {
+      console.error('Error fetching blogs:', error.message)
+    } else if (data) {
+      // We map the data to flatten the author array into a single object
+      const formattedBlogs = data.map((blog: any) => ({
+        ...blog,
+        // If author is an array, take the first element; otherwise use as is
+        author: Array.isArray(blog.author) ? blog.author[0] : blog.author
+      })) as Blog[]
 
-    setBlogs(formattedBlogs)
+      setBlogs(formattedBlogs)
+    }
+
+    setLoading(false)
   }
-  
-  setLoading(false)
-}
 
   if (loading && blogs.length === 0) {
     return (
@@ -94,10 +94,9 @@ const fetchBlogs = async () => {
           {blogs.map(blog => (
             <motion.article key={blog.id}
               className="
-                  bg-white/5 border border-white/10
-                  rounded-xl p-6 hover:border-blue-500/40
-                  transition cursor-pointer
-                  transition-transform duration-300 group-hover:scale-105
+                 bg-white/5 border border-white/10
+  rounded-xl p-6 hover:border-blue-500/40
+  transition duration-300
                 "
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}

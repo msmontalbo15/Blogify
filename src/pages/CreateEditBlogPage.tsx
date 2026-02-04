@@ -143,7 +143,8 @@ export function CreateEditBlogPage(): JSX.Element {
 
 
   return (
-    <div className="max-w-3xl mx-auto p-4">
+    
+    <div className="max-w-3xl mx-auto p-4 pt-20">
       <h1 className="text-3xl font-bold mb-4">
         {isEdit ? 'Edit Blog' : 'Create Blog'}
       </h1>

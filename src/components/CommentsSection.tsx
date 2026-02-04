@@ -1,24 +1,26 @@
 import { useEffect, useState } from 'react'
-import type { JSX,ChangeEvent } from 'react'
+import type { JSX, ChangeEvent } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSelector } from 'react-redux'
 import type { RootState } from '../store/store'
+import ConfirmModal from '../components/ConfirmModal'
 
 interface Props {
   blogId: string
 }
 
+interface Profile {
+  full_name: string | null
+  avatar_url: string | null
+}
+
 interface Comment {
-  id: string; // or any
-  content: string;
-  image_url: string;
-  author_id: string;
-  created_at: string;
-  // Note the [] at the end here!
-  profiles: {
-    full_name: string;
-    avatar_url: string;
-  }[]; 
+  id: string
+  content: string
+  image_url: string | null
+  author_id: string
+  created_at: string
+  profiles: Profile | null
 }
 
 export default function CommentsSection({ blogId }: Props): JSX.Element {
@@ -28,14 +30,19 @@ export default function CommentsSection({ blogId }: Props): JSX.Element {
   const [content, setContent] = useState('')
   const [image, setImage] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
+
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
+  const [editImage, setEditImage] = useState<File | null>(null)
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [commentToDelete, setCommentToDelete] = useState<string | null>(null)
 
   useEffect(() => {
     fetchComments()
   }, [blogId])
 
-  // Fetch comments from Supabase
+  // ✅ Fetch comments
   const fetchComments = async () => {
     const { data, error } = await supabase
       .from('comments')
@@ -54,44 +61,42 @@ export default function CommentsSection({ blogId }: Props): JSX.Element {
       .order('created_at', { ascending: true })
 
     if (error) {
-      console.error('FETCH COMMENTS ERROR:', error)
+      console.error(error)
+      setComments([])
       return
     }
 
-    // Supabase already returns profiles as an object
-    setComments(data ?? [])
+    const normalizedComments: Comment[] = (data ?? []).map(comment => ({
+      ...comment,
+      profiles: Array.isArray(comment.profiles)
+        ? comment.profiles[0] ?? null
+        : comment.profiles ?? null,
+    }))
+
+    setComments(normalizedComments)
   }
 
-  // Post a new comment
+ 
+  /* ---------------- CREATE ---------------- */
   const handlePost = async () => {
     if (!user || !content.trim()) return
-
     setLoading(true)
+
     let imageUrl: string | null = null
 
     if (image) {
       const path = `${user.id}/${Date.now()}-${image.name}`
-      const { error: uploadError } = await supabase.storage
-        .from('comment-images')
-        .upload(path, image)
-
-      if (uploadError) {
-        console.error('IMAGE UPLOAD ERROR:', uploadError)
-        setLoading(false)
-        return
-      }
-
-      imageUrl = supabase.storage.from('comment-images').getPublicUrl(path).data.publicUrl
+      await supabase.storage.from('comment-images').upload(path, image)
+      imageUrl =
+        supabase.storage.from('comment-images').getPublicUrl(path).data.publicUrl
     }
 
-    const { error } = await supabase.from('comments').insert({
+    await supabase.from('comments').insert({
       blog_id: blogId,
       content,
       image_url: imageUrl,
       author_id: user.id
     })
-
-    if (error) console.error('INSERT COMMENT ERROR:', error)
 
     setContent('')
     setImage(null)
@@ -99,58 +104,100 @@ export default function CommentsSection({ blogId }: Props): JSX.Element {
     fetchComments()
   }
 
-  // Update existing comment
-  const handleUpdate = async (commentId: string) => {
-    if (!editContent.trim()) return
+  /* ---------------- UPDATE ---------------- */
+  const handleUpdate = async (comment: Comment) => {
     setLoading(true)
 
-    const { error } = await supabase
-      .from('comments')
-      .update({ content: editContent })
-      .eq('id', commentId)
+    let updatedImageUrl = comment.image_url
 
-    if (error) console.error('UPDATE ERROR:', error)
+    // Replace / add image
+    if (editImage) {
+      if (comment.image_url) {
+        const oldPath = comment.image_url.split('/comment-images/')[1]
+        await supabase.storage.from('comment-images').remove([oldPath])
+      }
+
+      const newPath = `${user!.id}/${Date.now()}-${editImage.name}`
+      await supabase.storage.from('comment-images').upload(newPath, editImage)
+      updatedImageUrl =
+        supabase.storage.from('comment-images').getPublicUrl(newPath).data.publicUrl
+    }
+
+    await supabase
+      .from('comments')
+      .update({
+        content: editContent,
+        image_url: updatedImageUrl
+      })
+      .eq('id', comment.id)
 
     setEditingId(null)
     setEditContent('')
+    setEditImage(null)
     setLoading(false)
     fetchComments()
   }
 
-  // Delete a comment
-  const handleDelete = async (id: string) => {
-    await supabase.from('comments').delete().eq('id', id)
+  /* ---------------- REMOVE IMAGE ---------------- */
+  const handleRemoveImage = async (comment: Comment) => {
+    if (!comment.image_url) return
+
+    const path = comment.image_url.split('/comment-images/')[1]
+    await supabase.storage.from('comment-images').remove([path])
+    await supabase.from('comments').update({ image_url: null }).eq('id', comment.id)
+
     fetchComments()
   }
 
+  /* ---------------- DELETE ---------------- */
+  const confirmDelete = async () => {
+    if (!commentToDelete) return
+    await supabase.from('comments').delete().eq('id', commentToDelete)
+    setShowDeleteModal(false)
+    setCommentToDelete(null)
+    fetchComments()
+  }
   return (
-    <div className="mt-10 space-y-4">
-      <h2 className="text-xl font-bold">Comments</h2>
+          <div className="mt-10 space-y-4">
+            <h2 className="text-xl font-bold">Comments</h2>
 
-      {comments.map(comment => (
-        <div key={comment.id}
-          className="bg-white/5 border border-white/10 rounded-xl p-6 hover:border-blue-500/40 transition cursor-pointer"
-        >
-          {editingId === comment.id ? (
-            <>
-              <textarea
-                className="w-full border p-2 rounded"
-                value={editContent}
-                onChange={e => setEditContent(e.target.value)}
+            {comments.map(comment => (
+            <div key={comment.id} className="bg-white/5 border rounded-xl p-6">
+              {editingId === comment.id ? (
+              <>
+                <textarea className="w-full border p-2 rounded" value={editContent} onChange={e=> setEditContent(e.target.value)}
               />
-              <div className="flex gap-2 mt-2">
+
+              {comment.image_url && (
+                <img src={comment.image_url} className="mt-2 w-40 rounded" />
+              )}
+
+              <input
+                type="file"
+                accept="image/*"
+                className="mt-2"
+                onChange={e => setEditImage(e.target.files?.[0] ?? null)}
+              />
+
+              {comment.image_url && (
                 <button
-                  onClick={() => handleUpdate(comment.id)}
-                  className="text-sm text-blue-600"
+                  onClick={() => handleRemoveImage(comment)}
+                  className="block mt-2 text-xs text-red-500"
+                >
+                  Remove image
+                </button>
+              )}
+
+              <div className="flex gap-3 mt-3">
+                <button
+                  onClick={() => handleUpdate(comment)}
+                  className="text-sm text-blue-500"
                 >
                   Save
                 </button>
                 <button
-                  onClick={() => {
-                    setEditingId(null)
-                    setEditContent('')
-                  }}
-                  className="text-sm text-gray-500"
+                  onClick={() => setEditingId(null)}
+                  className="text-sm text-gray-400"
                 >
                   Cancel
                 </button>
@@ -159,25 +206,21 @@ export default function CommentsSection({ blogId }: Props): JSX.Element {
           ) : (
             <>
               <div className="flex items-center gap-3 mb-2">
-                  
-                {comment.profiles[0]?.avatar_url ? (
-                  // <img
-                  //   src={comment.profiles.avatar_url}
-                  //   className="w-8 h-8 rounded-full"
-                  // />
-                  <img src={comment.profiles[0]?.avatar_url} alt="avatar" />
+                {comment.profiles?.avatar_url ? (
+                  <img
+                    src={comment.profiles.avatar_url}
+                    className="w-8 h-8 rounded-full"
+                  />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-sm">
-                    {comment.profiles[0]?.full_name?.[0] ?? '?'}
+                    {comment.profiles?.full_name?.[0] ?? '?'}
                   </div>
                 )}
 
                 <span className="text-sm font-medium">
-                  <p>{comment.profiles[0]?.full_name ?? 'Unknown'}</p>
-                  {/* {comment.profiles?.full_name ?? 'Unknown'} */}
+                  {comment.profiles?.full_name ?? 'Unknown'}
                 </span>
               </div>
-
               <p>{comment.content}</p>
 
               {comment.image_url && (
@@ -191,13 +234,16 @@ export default function CommentsSection({ blogId }: Props): JSX.Element {
                       setEditingId(comment.id)
                       setEditContent(comment.content)
                     }}
-                    className="text-sm text-blue-600"
+                    className="text-sm text-blue-500"
                   >
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDelete(comment.id)}
-                    className="text-sm text-red-600"
+                    onClick={() => {
+                      setCommentToDelete(comment.id)
+                      setShowDeleteModal(true)
+                    }}
+                    className="text-sm text-red-500"
                   >
                     Delete
                   </button>
@@ -207,6 +253,7 @@ export default function CommentsSection({ blogId }: Props): JSX.Element {
           )}
         </div>
       ))}
+
 
       {user && (
         <>
@@ -236,6 +283,14 @@ export default function CommentsSection({ blogId }: Props): JSX.Element {
           </button>
         </>
       )}
+    <ConfirmModal
+        isOpen={showDeleteModal}
+        title="Delete comment?"
+        description="This comment will be permanently removed."
+        confirmText="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteModal(false)}
+      />
     </div>
   )
 }

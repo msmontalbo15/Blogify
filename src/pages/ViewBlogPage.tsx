@@ -4,18 +4,18 @@ import { supabase } from '../lib/supabase'
 import type { JSX } from 'react'
 import CommentsSection from '../components/CommentsSection'
 import BackButton from '../components/BackButton'
+import ConfirmModal from '../components/ConfirmModal'
 
 interface Blog {
-  id: string;
-  title: string;
-  content: string;
-  created_at: string;
-  image_url: string;
-  author_id: string;
-  // Update this to be an array
-  profiles: { 
-    full_name: string; 
-  }[]; 
+  id: string
+  title: string
+  content: string
+  created_at: string
+  image_url: string | null
+  author_id: string
+  profiles: {
+    full_name: string
+  } | null
 }
 
 export function ViewBlogPage(): JSX.Element {
@@ -25,12 +25,12 @@ export function ViewBlogPage(): JSX.Element {
   const [userId, setUserId] = useState<string | null>(null)
   const [blog, setBlog] = useState<Blog | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
 
-      // get logged-in user
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -53,36 +53,30 @@ export function ViewBlogPage(): JSX.Element {
         .eq('id', id)
         .single()
 
-
-
       if (error) {
         console.error(error)
+        setBlog(null)
       } else {
-        setBlog(data as Blog);
+        const normalizedBlog: Blog = {
+          ...data,
+          profiles: Array.isArray(data.profiles)
+            ? data.profiles[0] ?? null
+            : data.profiles ?? null,
+        }
+
+        setBlog(normalizedBlog)
       }
 
       setLoading(false)
     }
 
-    fetchData()
+    if (id) fetchData()
   }, [id])
-
-  const handleDelete = async () => {
-    if (!blog) return
-
-    const { error } = await supabase
-      .from("blogs")
-      .delete()
-      .eq("id", blog.id)
-
-    if (!error) {
-      navigate("/")
-    }
-  }
 
   if (loading) return <p>Loading...</p>
   if (!blog) return <p>Blog not found</p>
 
+  const authorName = blog.profiles?.full_name ?? 'Unknown author'
   const isAuthor = userId === blog.author_id
 
   return (
@@ -90,16 +84,13 @@ export function ViewBlogPage(): JSX.Element {
       <h1 className="text-3xl font-bold pt-12">{blog.title}</h1>
 
       {blog.image_url && (
-        <img src={blog.image_url} className="rounded mb-4" />
+        <img src={blog.image_url} alt={blog.title} className="rounded mb-4" />
       )}
 
       <p>{blog.content}</p>
 
       <p className="text-sm text-gray-500">
-        Written by{' '}
-        <span className="font-medium">
-          {blog.profiles[0]?.full_name ?? 'Unknown author'}
-        </span>
+        Written by <span className="font-medium">{authorName}</span>
       </p>
 
       {isAuthor && (
@@ -112,7 +103,7 @@ export function ViewBlogPage(): JSX.Element {
           </button>
 
           <button
-            onClick={handleDelete}
+            onClick={() => setShowDeleteModal(true)}
             className="px-4 py-2 bg-red-600 text-white rounded"
           >
             Delete
@@ -122,6 +113,18 @@ export function ViewBlogPage(): JSX.Element {
 
       <CommentsSection blogId={blog.id} />
       <BackButton />
+
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        title="Delete blog?"
+        description="This action cannot be undone."
+        confirmText="Delete"
+        onCancel={() => setShowDeleteModal(false)}
+        onConfirm={async () => {
+          await supabase.from('blogs').delete().eq('id', blog.id)
+          navigate('/')
+        }}
+      />
     </div>
   )
 }
