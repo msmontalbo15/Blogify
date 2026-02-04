@@ -21,18 +21,40 @@ export default function App(): JSX.Element {
   
   // 🔐 Sync Supabase auth → Redux
 useEffect(() => {
-  supabase.auth.getSession().then(({ data }) => {
-    dispatch(setUser(data.session?.user ?? null))
-  })
+  const syncUser = async () => {
+    const { data } = await supabase.auth.getSession()
+    const supaUser = data.session?.user ?? null
+
+    if (supaUser) {
+      dispatch(setUser({
+        id: supaUser.id,
+        email: supaUser.user_metadata?.email ?? null,
+        full_name: supaUser.user_metadata?.full_name ?? null
+      }))
+    } else {
+      dispatch(setUser(null))
+    }
+  }
+
+  syncUser()
 
   const { data: listener } = supabase.auth.onAuthStateChange(
     (_event, session) => {
-      dispatch(setUser(session?.user ?? null))
+      const supaUser = session?.user ?? null
+      if (supaUser) {
+        dispatch(setUser({
+          id: supaUser.id,
+          email: supaUser.user_metadata?.email ?? null,
+          full_name: supaUser.user_metadata?.full_name ?? null
+        }))
+      } else {
+        dispatch(setUser(null))
+      }
     }
   )
 
   return () => listener.subscription.unsubscribe()
-}, [])
+}, [dispatch])
 
 
   return (
